@@ -405,6 +405,7 @@ class BIFWriter(object):
 
     """
     Base class for writing BIF network file format
+    make some change --- Xipeng Jin
     """
 
     def __init__(self, model):
