@@ -405,7 +405,7 @@ class BIFWriter(object):
 
     """
     Base class for writing BIF network file format
-    make some change --- Xipeng Jin
+
     """
 
     def __init__(self, model):
@@ -538,11 +538,11 @@ $properties}\n"""
         >>> model = BIFReader('dog-problem.bif').get_model()
         >>> writer = BIFWriter(model)
         >>> writer.get_states()
-        {'bowel-problem': ['bowel-problem_0', 'bowel-problem_1'],
-         'dog-out': ['dog-out_0', 'dog-out_1'],
-         'family-out': ['family-out_0', 'family-out_1'],
-         'hear-bark': ['hear-bark_0', 'hear-bark_1'],
-         'light-on': ['light-on_0', 'light-on_1']}
+        {'bowel-problem': ['true', 'false'],
+         'dog-out': ['true', 'false'],
+         'family-out': ['true', 'false'],
+         'hear-bark': ['true', 'false'],
+         'light-on': ['true', 'false']}
         """
         variable_states = {}
         cpds = self.model.get_cpds()
@@ -550,7 +550,7 @@ $properties}\n"""
             variable = cpd.variable
             variable_states[variable] = []
             for state in range(cpd.get_cardinality([variable])[variable]):
-                variable_states[variable].append(str(state))
+                variable_states[variable].append(cpd.state_names[variable][state])
         return variable_states
 
     def get_properties(self):

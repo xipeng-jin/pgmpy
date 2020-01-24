@@ -356,6 +356,7 @@ class TestBIFWriter(unittest.TestCase):
                 evidence_card=[
                     len(states[evidence_var]) for evidence_var in parents[var]
                 ],
+                state_names={var: states[var]}
             )
             tabular_cpds.append(cpd)
         self.model.add_cpds(*tabular_cpds)
@@ -366,6 +367,20 @@ class TestBIFWriter(unittest.TestCase):
                 self.model.nodes[node][prop_name] = prop_value
 
         self.writer = BIFWriter(model=self.model)
+
+    def test_get_states(self):
+
+        states_expected = {
+            "bowel-problem": ["true", "false"],
+            "dog-out": ["true", "false"],
+            "family-out": ["true", "false"],
+            "hear-bark": ["true", "false"],
+            "kid": ["true", "false"],
+            "light-on": ["true", "false"],
+        }
+        states = self.writer.get_states()
+        for variable in states_expected:
+            self.assertListEqual(states_expected[variable], states[variable])
 
     def test_str(self):
         self.expected_string = """network unknown {
