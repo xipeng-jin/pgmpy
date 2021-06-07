@@ -147,16 +147,16 @@ class LinearGaussianBayesianNetwork(BayesianModel):
         >>> from pgmpy.factors.continuous import LinearGaussianCPD
         >>> model = LinearGaussianBayesianNetwork([('x1', 'x2'), ('x2', 'x3')])
         >>> cpd1 = LinearGaussianCPD('x1', [1], 4)
-        >>> cpd2 = LinearGaussianCPD('x2', [-5, 0.5], 4, ['x1'])
-        >>> cpd3 = LinearGaussianCPD('x3', [4, -1], 3, ['x2'])
+        >>> cpd2 = LinearGaussianCPD('x2', [-3.5, 0.5], 4, ['x1'])
+        >>> cpd3 = LinearGaussianCPD('x3', [1, -1], 3, ['x2'])
         >>> model.add_cpds(cpd1, cpd2, cpd3)
         >>> jgd = model.to_joint_gaussian()
         >>> jgd.variables
         ['x1', 'x2', 'x3']
         >>> jgd.mean
         array([[ 1. ],
-               [-4.5],
-               [ 8.5]])
+               [-3. ],
+               [ 4. ]])
         >>> jgd.covariance
         array([[ 4.,  2., -2.],
                [ 2.,  5., -5.],
