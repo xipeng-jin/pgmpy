@@ -173,7 +173,7 @@ class LinearGaussianBayesianNetwork(BayesianModel):
                 sum(
                     [
                         coeff * mean[variables.index(parent)]
-                        for coeff, parent in zip(cpd.mean, cpd.evidence)
+                        for coeff, parent in zip(cpd.mean[1:], cpd.evidence)
                     ]
                 )
                 + cpd.mean[0]
@@ -184,7 +184,7 @@ class LinearGaussianBayesianNetwork(BayesianModel):
                         coeff
                         * coeff
                         * covariance[variables.index(parent), variables.index(parent)]
-                        for coeff, parent in zip(cpd.mean, cpd.evidence)
+                        for coeff, parent in zip(cpd.mean[1:], cpd.evidence)
                     ]
                 )
                 + cpd.variance
@@ -201,7 +201,7 @@ class LinearGaussianBayesianNetwork(BayesianModel):
                     covariance[node_i_idx, node_j_idx] = sum(
                         [
                             coeff * covariance[node_i_idx, variables.index(parent)]
-                            for coeff, parent in zip(cpd_j.mean, cpd_j.evidence)
+                            for coeff, parent in zip(cpd_j.mean[1:], cpd_j.evidence)
                         ]
                     )
 

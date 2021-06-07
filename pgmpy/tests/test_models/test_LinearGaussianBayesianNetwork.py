@@ -11,9 +11,9 @@ from pgmpy.models import LinearGaussianBayesianNetwork
 class TestLGBNMethods(unittest.TestCase):
     def setUp(self):
         self.model = LinearGaussianBayesianNetwork([("x1", "x2"), ("x2", "x3")])
-        self.cpd1 = LinearGaussianCPD("x1", [1], 4)
-        self.cpd2 = LinearGaussianCPD("x2", [-5, 0.5], 4, ["x1"])
-        self.cpd3 = LinearGaussianCPD("x3", [4, -1], 3, ["x2"])
+        self.cpd1 = LinearGaussianCPD("x1", [1.0], 4)
+        self.cpd2 = LinearGaussianCPD("x2", [-3.5, 0.5], 4, ["x1"])
+        self.cpd3 = LinearGaussianCPD("x3", [1.0, -1.0], 3, ["x2"])
 
     def test_cpds_simple(self):
         self.assertEqual("x1", self.cpd1.variable)
@@ -65,12 +65,11 @@ class TestLGBNMethods(unittest.TestCase):
         self.assertRaises(ValueError, self.model.add_cpds, 1)
         self.assertRaises(ValueError, self.model.add_cpds, 1, tab_cpd)
 
-    @unittest.skip("TODO")
     def test_to_joint_gaussian(self):
         self.model.add_cpds(self.cpd1, self.cpd2, self.cpd3)
         jgd = self.model.to_joint_gaussian()
         self.assertEqual(jgd.variables, ["x1", "x2", "x3"])
-        np_test.assert_array_equal(jgd.mean, np.array([[1.0], [-4.5], [8.5]]))
+        np_test.assert_array_equal(jgd.mean, np.array([[1.0], [-3.0], [4.0]]))
         np_test.assert_array_equal(
             jgd.covariance,
             np.array([[4.0, 2.0, -2.0], [2.0, 5.0, -5.0], [-2.0, -5.0, 8.0]]),
