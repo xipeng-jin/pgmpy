@@ -4,6 +4,7 @@ import pandas as pd
 from scipy.stats import multivariate_normal
 
 from pgmpy.factors.base import BaseFactor
+from pgmpy.factors.distributions import CanonicalDistribution
 
 
 class LinearGaussianCPD(BaseFactor):
@@ -79,10 +80,33 @@ class LinearGaussianCPD(BaseFactor):
         self.evidence = evidence
         self.sigma_yx = None
 
-        self.variables = [variable] + evidence
+        self.variables = evidence + [variable]
         super(LinearGaussianCPD, self).__init__(
             self.variables, pdf="gaussian", mean=self.mean, covariance=self.variance
         )
+
+    def to_factor(self):
+        """
+        Returns an equivalent canonical form factor with same variables
+        """
+        beta_0 = self.mean[0]
+        variance = self.variance
+        if len(self.mean) > 1:
+            beta_vec = np.asarray(self.mean[1:], dtype=float).reshape(-1, 1)
+            K11 = np.dot(beta_vec, beta_vec.T) / variance
+            K12 = -beta_vec / variance
+            K21 = -beta_vec.T / variance
+            K22 = np.array([[1 / variance]])
+            K = np.bmat([[K11, K12],
+                         [K21, K22]])
+
+            h1 = (-beta_0 / variance) * beta_vec
+            h2 = beta_0 / variance
+            h = np.vstack([h1, h2])
+        else:
+            K = np.array([[1 / variance]])
+            h = K * beta_0
+        return CanonicalDistribution(self.variables, K, h, 0)
 
     def sum_of_product(self, xi, xj):
         prod_xixj = xi * xj
