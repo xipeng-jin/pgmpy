@@ -3,11 +3,11 @@ import numpy as np
 import pandas as pd
 from scipy.stats import multivariate_normal
 
-from pgmpy.factors.base import BaseFactor
+from pgmpy.factors.continuous import ContinuousFactor
 from pgmpy.factors.distributions import CanonicalDistribution
 
 
-class LinearGaussianCPD(BaseFactor):
+class LinearGaussianCPD(ContinuousFactor):
     r"""
     For, X -> Y the Linear Gaussian model assumes that the mean
     of Y is a linear function of mean of X and the variance of Y does
@@ -74,23 +74,24 @@ class LinearGaussianCPD(BaseFactor):
         [0.2, -2, 3, 7]
 
         """
-        self.variable = variable
         self.mean = evidence_mean
         self.variance = evidence_variance
         self.evidence = evidence
         self.sigma_yx = None
 
         self.variables = evidence + [variable]
+        self.canonical_form = self.to_canonical_form()
         super(LinearGaussianCPD, self).__init__(
-            self.variables, pdf="gaussian", mean=self.mean, covariance=self.variance
+            self.variables, self.canonical_form
         )
 
-    def to_factor(self):
+    def to_canonical_form(self):
         """
-        Returns an equivalent canonical form factor with same variables
+        Returns an equivalent canonical form
         """
         beta_0 = self.mean[0]
         variance = self.variance
+
         if len(self.mean) > 1:
             beta_vec = np.asarray(self.mean[1:], dtype=float).reshape(-1, 1)
             K11 = np.dot(beta_vec, beta_vec.T) / variance
@@ -106,7 +107,11 @@ class LinearGaussianCPD(BaseFactor):
         else:
             K = np.array([[1 / variance]])
             h = K * beta_0
+
         return CanonicalDistribution(self.variables, K, h, 0)
+
+    def to_factor(self):
+        return ContinuousFactor(self.variables, self.canonical_form)
 
     def sum_of_product(self, xi, xj):
         prod_xixj = xi * xj
