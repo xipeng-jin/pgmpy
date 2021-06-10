@@ -4,7 +4,7 @@ import numpy as np
 import scipy.integrate as integrate
 
 from pgmpy.factors.base import BaseFactor
-from pgmpy.factors.distributions import GaussianDistribution, CustomDistribution
+from pgmpy.factors.distributions import GaussianDistribution, CanonicalDistribution, CustomDistribution
 
 
 class ContinuousFactor(BaseFactor):
@@ -45,19 +45,22 @@ class ContinuousFactor(BaseFactor):
         if len(set(variables)) != len(variables):
             raise ValueError("Variable names cannot be same.")
 
-        variables = list(variables)
+        self.variables = list(variables)
 
         if isinstance(pdf, str):
             if pdf == "gaussian":
                 self.distribution = GaussianDistribution(
                     variables=variables,
                     mean=kwargs["mean"],
-                    covariance=kwargs["covariance"],
+                    cov=kwargs["covariance"]
                 )
             else:
                 raise NotImplementedError(
                     f"{pdf} distribution not supported. Please use CustomDistribution"
                 )
+
+        elif isinstance(pdf, CanonicalDistribution):
+            self.distribution = pdf
 
         elif isinstance(pdf, CustomDistribution):
             self.distribution = pdf
@@ -69,7 +72,7 @@ class ContinuousFactor(BaseFactor):
 
         else:
             raise ValueError(
-                f"pdf: Expected type: str or function, Got: {type(variables)}"
+                f"pdf: Expected type: str or function, Got: {type(pdf)}"
             )
 
     @property
@@ -81,7 +84,7 @@ class ContinuousFactor(BaseFactor):
 
     @property
     def variable(self):
-        return self.scope()[0]
+        return self.scope()[-1]
 
     def scope(self):
         """
