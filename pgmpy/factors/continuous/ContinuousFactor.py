@@ -45,18 +45,18 @@ class ContinuousFactor(BaseFactor):
         if len(set(variables)) != len(variables):
             raise ValueError("Variable names cannot be same.")
 
-        self.variables = list(variables)
+        variables = list(variables)
 
         if isinstance(pdf, str):
             if pdf == "gaussian":
                 self.distribution = GaussianDistribution(
-                    variables=self.variables,
+                    variables=variables,
                     mean=kwargs["mean"],
                     cov=kwargs["covariance"]
                 )
             elif pdf == "canonical":
                 self.distribution = CanonicalDistribution(
-                    variables=self.variables,
+                    variables=variables,
                     K=kwargs["K"],
                     h=kwargs["h"],
                     g=kwargs["g"]
@@ -93,6 +93,10 @@ class ContinuousFactor(BaseFactor):
     def variable(self):
         return self.scope()[-1]
 
+    @property
+    def variables(self):
+        return list(self.scope())
+
     def scope(self):
         """
         Returns the scope of the factor.
@@ -113,7 +117,7 @@ class ContinuousFactor(BaseFactor):
         return self.distribution.variables
 
     def get_evidence(self):
-        return self.scope()[1:]
+        return self.scope()[:-1]
 
     def assignment(self, *args):
         """

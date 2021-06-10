@@ -51,7 +51,7 @@ class GaussianDistribution(BaseDistribution):
         """
         no_of_var = len(variables)
 
-        self.variables = variables
+        self.variables = list(variables)
         self.mean = np.asarray(np.reshape(mean, (no_of_var, 1)), dtype=float)
         self.covariance = np.asarray(cov, dtype=float)
         self._precision_matrix = None

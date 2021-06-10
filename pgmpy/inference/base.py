@@ -81,13 +81,15 @@ class Inference(object):
                 cpd = self.model.get_cpds(node)
                 if isinstance(cpd, TabularCPD):
                     self.cardinality[node] = cpd.variable_card
-                    cpd = cpd.to_factor()
+                cpd = cpd.to_factor()
                 for var in cpd.scope():
                     self.factors[var].append(cpd)
-                self.state_names_map.update(cpd.no_to_name)
+                if isinstance(cpd, TabularCPD):
+                    self.state_names_map.update(cpd.no_to_name)
 
         elif isinstance(self.model, (MarkovModel, FactorGraph, JunctionTree)):
-            self.cardinality = self.model.get_cardinality()
+            if self.model.type == "discrete":
+                self.cardinality = self.model.get_cardinality()
 
             for factor in self.model.get_factors():
                 for var in factor.variables:

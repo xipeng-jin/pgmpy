@@ -79,12 +79,12 @@ class LinearGaussianCPD(ContinuousFactor):
         self.evidence = evidence
         self.sigma_yx = None
 
-        self.variables = evidence + [variable]
+        variables = evidence + [variable]
         super(LinearGaussianCPD, self).__init__(
-            self.variables, self.to_canonical_form()
+            variables, self.to_canonical_form(variables)
         )
 
-    def to_canonical_form(self):
+    def to_canonical_form(self, variables):
         """
         Returns an equivalent canonical form
         """
@@ -107,10 +107,13 @@ class LinearGaussianCPD(ContinuousFactor):
             K = np.array([[1 / variance]])
             h = K * beta_0
 
-        return CanonicalDistribution(self.variables, K, h, 0)
+        return CanonicalDistribution(variables, K, h, 0)
 
     def to_factor(self):
-        return ContinuousFactor(self.variables, self.to_canonical_form())
+        return ContinuousFactor(
+            self.variables,
+            self.to_canonical_form(self.variables)
+        )
 
     def sum_of_product(self, xi, xj):
         prod_xixj = xi * xj

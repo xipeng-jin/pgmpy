@@ -73,7 +73,7 @@ class CanonicalDistribution(BaseDistribution):
                 "the number of variables."
             )
 
-        self.variables = variables
+        self.variables = list(variables)
         self.h = np.asarray(np.reshape(h, (no_of_var, 1)), dtype=float)
         self.g = g
         self.K = np.asarray(K, dtype=float)
@@ -300,6 +300,20 @@ class CanonicalDistribution(BaseDistribution):
         if not inplace:
             return phi
 
+    def normalize(self, inplace=True):
+        """
+        Normalizes the distribution. In case of a Canonical Distribution the
+        distribution is always normalized, therefore this method doesn't do
+        anything and has been implemented only for a consistent API across
+        distributions.
+        """
+        phi = self if inplace else self.copy()
+
+        # The pdf of a canonical distribution is always
+        # normalized. Hence, no changes.
+        if not inplace:
+            return phi
+
     def marginalize(self, variables, inplace=True):
         """
         Modifies the factor with marginalized values.
@@ -394,15 +408,15 @@ class CanonicalDistribution(BaseDistribution):
 
         phi.K = K_i_i - np.dot(np.dot(K_i_j, K_j_j_inv), K_j_i)
         phi.h = h_i - np.dot(np.dot(K_i_j, K_j_j_inv), h_j)
-        phi.g = (
-            self.g
-            + 0.5
-            * (
-                len(variables) * np.log(2 * np.pi)
-                - np.log(abs(np.linalg.det(K_j_j)))
-                + np.dot(np.dot(h_j.T, K_j_j), h_j)
-            )[0][0]
-        )
+        # phi.g = (
+        #     self.g
+        #     + 0.5
+        #     * (
+        #         len(variables) * np.log(2 * np.pi)
+        #         - np.log(abs(np.linalg.det(K_j_j)))
+        #         + np.dot(np.dot(h_j.T, K_j_j), h_j)
+        #     )[0][0]
+        # )
 
         if not inplace:
             return phi

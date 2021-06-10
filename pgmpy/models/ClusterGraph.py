@@ -6,6 +6,8 @@ import numpy as np
 
 from pgmpy.base import UndirectedGraph
 from pgmpy.factors import factor_product
+from pgmpy.factors.discrete import DiscreteFactor
+from pgmpy.factors.continuous import ContinuousFactor
 
 
 class ClusterGraph(UndirectedGraph):
@@ -59,6 +61,7 @@ class ClusterGraph(UndirectedGraph):
         if ebunch:
             self.add_edges_from(ebunch)
         self.factors = []
+        self.type = None
 
     def add_node(self, node, **kwargs):
         """
@@ -152,6 +155,14 @@ class ClusterGraph(UndirectedGraph):
         >>> student.add_factors(factor)
         """
         for factor in factors:
+            if isinstance(factor, DiscreteFactor):
+                self.type = "discrete"
+            elif isinstance(factor, ContinuousFactor):
+                self.type = "continuous"
+            else:
+                raise ValueError(
+                    "Cluster graph only support DiscreteFactor and ContinuousFactor"
+                )
             factor_scope = set(factor.scope())
             nodes = [set(node) for node in self.nodes()]
             if factor_scope not in nodes:
@@ -313,18 +324,19 @@ class ClusterGraph(UndirectedGraph):
             if not any(factors):
                 raise ValueError("Factors for all the cliques or clusters not defined.")
 
-        cardinalities = self.get_cardinality()
-        if len(set((x for clique in self.nodes() for x in clique))) != len(
-            cardinalities
-        ):
-            raise ValueError("Factors for all the variables not defined.")
+        if self.type == "discrete":
+            cardinalities = self.get_cardinality()
+            if len(set((x for clique in self.nodes() for x in clique))) != len(
+                cardinalities
+            ):
+                raise ValueError("Factors for all the variables not defined.")
 
-        for factor in self.factors:
-            for variable, cardinality in zip(factor.scope(), factor.cardinality):
-                if cardinalities[variable] != cardinality:
-                    raise ValueError(
-                        f"Cardinality of variable {variable} not matching among factors"
-                    )
+            for factor in self.factors:
+                for variable, cardinality in zip(factor.scope(), factor.cardinality):
+                    if cardinalities[variable] != cardinality:
+                        raise ValueError(
+                            f"Cardinality of variable {variable} not matching among factors"
+                        )
 
         return True
 
