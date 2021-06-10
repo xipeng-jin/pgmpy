@@ -50,9 +50,16 @@ class ContinuousFactor(BaseFactor):
         if isinstance(pdf, str):
             if pdf == "gaussian":
                 self.distribution = GaussianDistribution(
-                    variables=variables,
+                    variables=self.variables,
                     mean=kwargs["mean"],
                     cov=kwargs["covariance"]
+                )
+            elif pdf == "canonical":
+                self.distribution = CanonicalDistribution(
+                    variables=self.variables,
+                    K=kwargs["K"],
+                    h=kwargs["h"],
+                    g=kwargs["g"]
                 )
             else:
                 raise NotImplementedError(

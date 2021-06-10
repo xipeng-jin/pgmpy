@@ -8,6 +8,7 @@ from networkx.algorithms.components import connected_components
 
 from pgmpy.base import UndirectedGraph
 from pgmpy.factors.discrete import DiscreteFactor
+from pgmpy.factors.continuous import ContinuousFactor
 from pgmpy.factors import factor_product
 from pgmpy.independencies import Independencies
 
@@ -77,6 +78,7 @@ class MarkovModel(UndirectedGraph):
         super(MarkovModel, self).__init__()
         if ebunch:
             self.add_edges_from(ebunch)
+        self.continuous_type = False
         self.factors = []
         self.latents = latents
 
@@ -135,6 +137,9 @@ class MarkovModel(UndirectedGraph):
                 set(self.nodes())
             ):
                 raise ValueError("Factors defined on variable not in the model", factor)
+
+            if isinstance(factor, ContinuousFactor):
+                self.continuous_type = True
 
             self.factors.append(factor)
 
@@ -243,6 +248,8 @@ class MarkovModel(UndirectedGraph):
         check: boolean
             True if all the checks are passed
         """
+        if self.continuous_type:
+            return True
         cardinalities = self.get_cardinality()
         for factor in self.factors:
             for variable, cardinality in zip(factor.scope(), factor.cardinality):
@@ -543,10 +550,18 @@ class MarkovModel(UndirectedGraph):
                     is_used[factor] = True
 
             # To compute clique potential, initially set it as unity factor
-            var_card = [self.get_cardinality()[x] for x in node]
-            clique_potential = DiscreteFactor(
-                node, var_card, np.ones(np.product(var_card))
-            )
+            if self.continuous_type:
+                clique_potential = ContinuousFactor(
+                    node, pdf="canonical",
+                    K=np.zeros((len(node), len(node))),
+                    h=np.zeros((len(node), 1)),
+                    g=0
+                )
+            else:
+                var_card = [self.get_cardinality()[x] for x in node]
+                clique_potential = DiscreteFactor(
+                    node, var_card, np.ones(np.product(var_card))
+                )
             # multiply it with the factors associated with the variables present
             # in the clique (or node)
             # Checking if there's clique_factors, to handle the case when clique_factors
