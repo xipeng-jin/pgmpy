@@ -246,7 +246,7 @@ class LinearGaussianCPD(ContinuousFactor):
         ['X1', 'X2', 'X3']
         """
         copy_cpd = LinearGaussianCPD(
-            self.variable, self.beta, self.variance, list(self.evidence)
+            self.variable, self.mean, self.variance, list(self.evidence)
         )
 
         return copy_cpd

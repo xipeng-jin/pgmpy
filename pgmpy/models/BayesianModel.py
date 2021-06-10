@@ -18,7 +18,8 @@ from pgmpy.factors.discrete import (
     JointProbabilityDistribution,
     DiscreteFactor,
 )
-from pgmpy.factors.continuous import ContinuousFactor
+from pgmpy.factors.continuous import ContinuousFactor, LinearGaussianCPD
+from pgmpy.factors.distributions import GaussianDistribution
 from pgmpy.models.MarkovModel import MarkovModel
 
 
@@ -97,6 +98,7 @@ class BayesianModel(DAG):
         """
         super(BayesianModel, self).__init__(ebunch=ebunch, latents=latents)
         self.cpds = []
+        self.type = None
         self.cardinalities = defaultdict(int)
 
     def add_edge(self, u, v, **kwargs):
@@ -251,8 +253,12 @@ class BayesianModel(DAG):
         +------+------+------+---------+------+------+-------+
         """
         for cpd in cpds:
-            if not isinstance(cpd, (TabularCPD, ContinuousFactor)):
-                raise ValueError("Only TabularCPD or ContinuousFactor can be added.")
+            if isinstance(cpd, TabularCPD):
+                self.type = "discrete"
+            elif isinstance(cpd, LinearGaussianCPD):
+                self.type = "continuous"
+            else:
+                raise ValueError("Only TabularCPD or LinearGaussianCPD can be added.")
 
             if set(cpd.scope()) - set(cpd.scope()).intersection(set(self.nodes())):
                 raise ValueError("CPD defined on variable not in the model", cpd)
@@ -389,7 +395,7 @@ class BayesianModel(DAG):
 
             if cpd is None:
                 raise ValueError(f"No CPD associated with {node}")
-            elif isinstance(cpd, (TabularCPD, ContinuousFactor)):
+            elif isinstance(cpd, TabularCPD):
                 evidence = cpd.get_evidence()
                 parents = self.get_parents(node)
                 if set(evidence if evidence else []) != set(parents if parents else []):
@@ -400,7 +406,100 @@ class BayesianModel(DAG):
                     raise ValueError(
                         f"Sum or integral of conditional probabilites for node {node} is not equal to 1."
                     )
+            elif isinstance(cpd, LinearGaussianCPD):
+                if set(cpd.evidence) != set(self.get_parents(node)):
+                    raise ValueError(
+                        "CPD associated with %s doesn't have "
+                        "proper parents associated with it." % node
+                    )
         return True
+
+    def to_joint_gaussian(self):
+        """
+        The linear Gaussian Bayesian Networks are an alternative
+        representation for the class of multivariate Gaussian distributions.
+        This method returns an equivalent joint Gaussian distribution.
+
+        Returns
+        -------
+        GaussianDistribution: An equivalent joint Gaussian
+                                   distribution for the network.
+
+        Reference
+        ---------
+        Section 7.2, Example 7.3,
+        Probabilistic Graphical Models, Principles and Techniques
+
+        Examples
+        --------
+        >>> from pgmpy.models import LinearGaussianBayesianNetwork
+        >>> from pgmpy.factors.continuous import LinearGaussianCPD
+        >>> model = LinearGaussianBayesianNetwork([('x1', 'x2'), ('x2', 'x3')])
+        >>> cpd1 = LinearGaussianCPD('x1', [1], 4)
+        >>> cpd2 = LinearGaussianCPD('x2', [-3.5, 0.5], 4, ['x1'])
+        >>> cpd3 = LinearGaussianCPD('x3', [1, -1], 3, ['x2'])
+        >>> model.add_cpds(cpd1, cpd2, cpd3)
+        >>> jgd = model.to_joint_gaussian()
+        >>> jgd.variables
+        ['x1', 'x2', 'x3']
+        >>> jgd.mean
+        array([[ 1. ],
+               [-3. ],
+               [ 4. ]])
+        >>> jgd.covariance
+        array([[ 4.,  2., -2.],
+               [ 2.,  5., -5.],
+               [-2., -5.,  8.]])
+
+        """
+        if self.type != "continuous":
+            raise ValueError(
+                f"to_joint_gaussian function expected continuous type Bayesian model, but got {self.type} type model."
+            )
+
+        variables = list(nx.topological_sort(self))
+        mean = np.zeros(len(variables))
+        covariance = np.zeros((len(variables), len(variables)))
+
+        for node_idx in range(len(variables)):
+            cpd = self.get_cpds(variables[node_idx])
+            mean[node_idx] = (
+                sum(
+                    [
+                        coeff * mean[variables.index(parent)]
+                        for coeff, parent in zip(cpd.mean[1:], cpd.evidence)
+                    ]
+                )
+                + cpd.mean[0]
+            )
+            covariance[node_idx, node_idx] = (
+                sum(
+                    [
+                        coeff
+                        * coeff
+                        * covariance[variables.index(parent), variables.index(parent)]
+                        for coeff, parent in zip(cpd.mean[1:], cpd.evidence)
+                    ]
+                )
+                + cpd.variance
+            )
+
+        for node_i_idx in range(len(variables)):
+            for node_j_idx in range(len(variables)):
+                if covariance[node_j_idx, node_i_idx] != 0:
+                    covariance[node_i_idx, node_j_idx] = covariance[
+                        node_j_idx, node_i_idx
+                    ]
+                else:
+                    cpd_j = self.get_cpds(variables[node_j_idx])
+                    covariance[node_i_idx, node_j_idx] = sum(
+                        [
+                            coeff * covariance[node_i_idx, variables.index(parent)]
+                            for coeff, parent in zip(cpd_j.mean[1:], cpd_j.evidence)
+                        ]
+                    )
+
+        return GaussianDistribution(variables, mean, covariance)
 
     def to_markov_model(self):
         """
