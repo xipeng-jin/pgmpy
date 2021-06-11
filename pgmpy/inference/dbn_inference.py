@@ -1,5 +1,6 @@
 from collections import defaultdict
 from itertools import tee, chain, combinations
+import pandas as pd
 
 from pgmpy.factors.discrete import DiscreteFactor
 from pgmpy.factors import factor_product
@@ -218,7 +219,7 @@ class DBNInference(Inference):
         new_scope = self._shift_nodes(factor.scope(), shift)
         return DiscreteFactor(new_scope, factor.cardinality, factor.values)
 
-    def forward_inference(self, variables, evidence=None, args=None):
+    def forward_inference(self, variables, return_series=False, evidence=None, args=None):
         """
         Forward inference method using belief propagation.
 
@@ -226,6 +227,9 @@ class DBNInference(Inference):
         ----------
         variables: list
             list of variables for which you want to compute the probability
+
+        return_series: Boolean
+            Whether to return the whole process series results
 
         evidence: dict
             a dict key, value pair as {var: state_of_var_observed}
@@ -284,10 +288,23 @@ class DBNInference(Inference):
         potential_dict[0] = marginalized_factor
         self._update_belief(mid_bp, self.in_clique, marginalized_factor)
 
-        if variable_dict[0]:
+        if variable_dict[0] or return_series:
+            variable_time = self._shift_nodes(variables, 0)
             factor_values = start_bp.query(
-                variable_dict[0], evidence=evidence_0, joint=False
+                variable_time, evidence=evidence_0, joint=False
             )
+
+            if return_series:
+                df_factor_values_dict = {}
+                for key in factor_values.keys():
+                    factor_values_dict = {}
+                    factor = factor_values[key]
+                    state_names = factor.state_names[key]
+                    name_to_no = factor.name_to_no[key]
+                    for name in state_names:
+                        name_no = name_to_no[name]
+                        factor_values_dict[name] = factor.values[name_no]
+                    df_factor_values_dict[key[0]] = pd.DataFrame(factor_values_dict, index=[0])
         else:
             factor_values = {}
 
@@ -296,8 +313,8 @@ class DBNInference(Inference):
             if interface_nodes_dict:
                 evidence_time.update(interface_nodes_dict)
 
-            if variable_dict[time_slice]:
-                variable_time = self._shift_nodes(variable_dict[time_slice], 1)
+            if variable_dict[time_slice] or return_series:
+                variable_time = self._shift_nodes(variables, 1)
                 new_values = mid_bp.query(
                     variable_time, evidence=evidence_time, joint=False
                 )
@@ -307,6 +324,15 @@ class DBNInference(Inference):
                     new_factor = DiscreteFactor(
                         [new_key], new_values[key].cardinality, new_values[key].values
                     )
+                    if return_series:
+                        factor_values_dict = {}
+                        state_names = new_factor.state_names[new_key]
+                        name_to_no = new_factor.name_to_no[new_key]
+                        for name in state_names:
+                            name_no = name_to_no[name]
+                            factor_values_dict[name] = new_factor.values[name_no]
+                        df_factor_values_dict[new_key[0]] = \
+                            df_factor_values_dict[new_key[0]].append(factor_values_dict, ignore_index=True)
                     changed_values[new_key] = new_factor
                 factor_values.update(changed_values)
 
@@ -330,6 +356,8 @@ class DBNInference(Inference):
 
         if args == "potential":
             return potential_dict
+        elif return_series:
+            return df_factor_values_dict
 
         return factor_values
 
