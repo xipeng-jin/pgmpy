@@ -555,6 +555,13 @@ class GaussianDistribution(BaseDistribution):
         """
         return self._operate(other, operation="divide", inplace=inplace)
 
+    def __str__(self):
+        rep_str = "N(({variables});\nmean=\n{mean},\ncovariance=\n{covariance})".format(
+            variables=", ".join([str(var) for var in self.variables]),
+            mean=str(self.mean), covariance=str(self.covariance)
+        )
+        return rep_str
+
     def __repr__(self):
         return (
             f"GaussianDistribution representing N({self.variables}) at {hex(id(self))}"

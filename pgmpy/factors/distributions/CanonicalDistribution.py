@@ -615,6 +615,18 @@ class CanonicalDistribution(BaseDistribution):
         """
         return self._operate(other, operation="divide", inplace=inplace)
 
+    def __str__(self):
+        rep_str = "C(({variables});\nK=\n{K},\nh=\n{h},\ng={g})".format(
+            variables=", ".join([str(var) for var in self.variables]),
+            K=str(self.K), h=str(self.h), g=str(self.g)
+        )
+        return rep_str
+
+    def __repr__(self):
+        return(
+            f"CanonicalDistribution representing C({self.variables}) at {hex(id(self))}"
+        )
+
     def __mul__(self, other):
         return self.product(other, inplace=False)
 

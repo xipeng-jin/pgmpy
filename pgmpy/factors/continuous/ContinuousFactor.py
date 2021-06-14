@@ -67,6 +67,10 @@ class ContinuousFactor(BaseFactor):
                 )
 
         elif isinstance(pdf, CanonicalDistribution):
+            if variables != pdf.variables:
+                raise ValueError(
+                    "ContinuousFactor variables are not same as distribution variables."
+                )
             self.distribution = pdf
 
         elif isinstance(pdf, CustomDistribution):
@@ -427,6 +431,31 @@ class ContinuousFactor(BaseFactor):
             raise ValueError("Scope of divisor should be a subset of dividend")
 
         return self._operate(other, "divide", inplace)
+
+    def __str__(self):
+        if isinstance(self.distribution, CanonicalDistribution):
+            rep_str = "C(({variables});\nK=\n{K},\nh=\n{h},\ng={g})".format(
+                variables=", ".join([str(var) for var in self.variables]),
+                K=str(self.distribution.K),
+                h=str(self.distribution.h),
+                g=str(self.distribution.g)
+            )
+        elif isinstance(self.distribution, GaussianDistribution):
+            rep_str = "N(({variables});\nmean=\n{mean},\ncovariance=\n{covariance})".format(
+                variables=", ".join([str(var) for var in self.variables]),
+                mean=str(self.distribution.mean),
+                covariance=str(self.distribution.covariance)
+            )
+        else:
+            raise NotImplementedError(
+                f"{self.distribution} not supported."
+            )
+        return rep_str
+
+    def __repr__(self):
+        return(
+            f"ContinuousFactor representing phi({self.variables}) at {hex(id(self))}"
+        )
 
     def __mul__(self, other):
         return self.product(other, inplace=False)
