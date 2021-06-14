@@ -78,7 +78,7 @@ class MarkovModel(UndirectedGraph):
         super(MarkovModel, self).__init__()
         if ebunch:
             self.add_edges_from(ebunch)
-        self.continuous_type = False
+        self.type = None
         self.factors = []
         self.latents = latents
 
@@ -139,7 +139,13 @@ class MarkovModel(UndirectedGraph):
                 raise ValueError("Factors defined on variable not in the model", factor)
 
             if isinstance(factor, ContinuousFactor):
-                self.continuous_type = True
+                self.type = "continuous"
+            elif isinstance(factor, DiscreteFactor):
+                self.type = "discrete"
+            else:
+                raise ValueError(
+                    f"Factor expected DiscreteFactor or ContinuousFactor, but got {type(factor)}."
+                )
 
             self.factors.append(factor)
 
@@ -248,20 +254,19 @@ class MarkovModel(UndirectedGraph):
         check: boolean
             True if all the checks are passed
         """
-        if self.continuous_type:
-            return True
-        cardinalities = self.get_cardinality()
-        for factor in self.factors:
-            for variable, cardinality in zip(factor.scope(), factor.cardinality):
-                if cardinalities[variable] != cardinality:
-                    raise ValueError(
-                        f"Cardinality of variable {variable} not matching among factors"
-                    )
-                if len(self.nodes()) != len(cardinalities):
-                    raise ValueError("Factors for all the variables not defined")
-            for var1, var2 in itertools.combinations(factor.variables, 2):
-                if var2 not in self.neighbors(var1):
-                    raise ValueError("DiscreteFactor inconsistent with the model.")
+        if self.type == "discrete":
+            cardinalities = self.get_cardinality()
+            for factor in self.factors:
+                for variable, cardinality in zip(factor.scope(), factor.cardinality):
+                    if cardinalities[variable] != cardinality:
+                        raise ValueError(
+                            f"Cardinality of variable {variable} not matching among factors"
+                        )
+                    if len(self.nodes()) != len(cardinalities):
+                        raise ValueError("Factors for all the variables not defined")
+                for var1, var2 in itertools.combinations(factor.variables, 2):
+                    if var2 not in self.neighbors(var1):
+                        raise ValueError("DiscreteFactor inconsistent with the model.")
         return True
 
     def to_factor_graph(self):
@@ -550,17 +555,21 @@ class MarkovModel(UndirectedGraph):
                     is_used[factor] = True
 
             # To compute clique potential, initially set it as unity factor
-            if self.continuous_type:
+            if self.type == "continuous":
                 clique_potential = ContinuousFactor(
                     node, pdf="canonical",
                     K=np.zeros((len(node), len(node))),
                     h=np.zeros((len(node), 1)),
                     g=0
                 )
-            else:
+            elif self.type == "discrete":
                 var_card = [self.get_cardinality()[x] for x in node]
                 clique_potential = DiscreteFactor(
                     node, var_card, np.ones(np.product(var_card))
+                )
+            else:
+                raise ValueError(
+                    f"Model type only support discrete and continuous network."
                 )
             # multiply it with the factors associated with the variables present
             # in the clique (or node)

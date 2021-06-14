@@ -3,6 +3,7 @@ from itertools import tee, chain, combinations
 import pandas as pd
 
 from pgmpy.factors.discrete import DiscreteFactor
+from pgmpy.factors.continuous import ContinuousFactor
 from pgmpy.factors import factor_product
 from pgmpy.inference import Inference, BeliefPropagation
 
@@ -217,7 +218,20 @@ class DBNInference(Inference):
            The new timeslice to which the factor should belong to.
         """
         new_scope = self._shift_nodes(factor.scope(), shift)
-        return DiscreteFactor(new_scope, factor.cardinality, factor.values)
+        if isinstance(factor, DiscreteFactor):
+            return DiscreteFactor(new_scope, factor.cardinality, factor.values)
+        elif isinstance(factor, ContinuousFactor):
+            return ContinuousFactor(
+                variables=new_scope,
+                pdf="canonical",
+                K=factor.distribution.K,
+                h=factor.distribution.h,
+                g=factor.distribution.g
+            )
+        else:
+            raise ValueError(
+                f"Factor expected DiscreteFactor or ContinuousFactor, but got {type(factor)}."
+            )
 
     def forward_inference(self, variables, return_series=False, evidence=None, args=None):
         """
@@ -321,9 +335,22 @@ class DBNInference(Inference):
                 changed_values = {}
                 for key in new_values.keys():
                     new_key = (key[0], time_slice)
-                    new_factor = DiscreteFactor(
-                        [new_key], new_values[key].cardinality, new_values[key].values
-                    )
+                    if self.model.type == "discrete":
+                        new_factor = DiscreteFactor(
+                            [new_key], new_values[key].cardinality, new_values[key].values
+                        )
+                    elif self.model.type == "continuous":
+                        new_factor = ContinuousFactor(
+                            variables=[new_key],
+                            pdf="canonical",
+                            K=new_values[key].distribution.K,
+                            h=new_values[key].distribution.h,
+                            g=new_values[key].distribution.g
+                        )
+                    else:
+                        raise ValueError(
+                            f"Model type only support discrete and continuous network."
+                        )
                     if return_series:
                         factor_values_dict = {}
                         state_names = new_factor.state_names[new_key]

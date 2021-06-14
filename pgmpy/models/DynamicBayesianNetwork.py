@@ -5,6 +5,7 @@ import numpy as np
 import networkx as nx
 
 from pgmpy.factors.discrete import TabularCPD
+from pgmpy.factors.continuous import LinearGaussianCPD
 from pgmpy.base import DAG
 
 
@@ -79,6 +80,7 @@ class DynamicBayesianNetwork(DAG):
         if ebunch:
             self.add_edges_from(ebunch)
         self.cpds = []
+        self.type = None
         self.cardinalities = defaultdict(int)
 
     def add_node(self, node, **attr):
@@ -387,8 +389,12 @@ class DynamicBayesianNetwork(DAG):
          <TabularCPD representing P(('I', 1):2 | ('I', 0):2) at 0x7ff7f27e6668>]
         """
         for cpd in cpds:
-            if not isinstance(cpd, TabularCPD):
-                raise ValueError("cpd should be an instance of TabularCPD")
+            if isinstance(cpd, TabularCPD):
+                self.type = "discrete"
+            elif isinstance(cpd, LinearGaussianCPD):
+                self.type = "continuous"
+            else:
+                raise ValueError("cpd should be an instance of TabularCPD or LinearGaussianCPD")
 
             if set(cpd.variables) - set(cpd.variables).intersection(
                 set(super(DynamicBayesianNetwork, self).nodes())
@@ -505,6 +511,12 @@ class DynamicBayesianNetwork(DAG):
                     raise ValueError(
                         f"Sum of probabilities of states for node {node} is not equal to 1"
                     )
+            elif isinstance(cpd, LinearGaussianCPD):
+                if set(cpd.evidence) != set(self.get_parents(node)):
+                    raise ValueError(
+                        "CPD associated with %s doesn't have "
+                        "proper parents associated with it." % node
+                    )
         return True
 
     def initialize_initial_state(self):
@@ -545,33 +557,55 @@ class DynamicBayesianNetwork(DAG):
             parents = self.get_parents(temp_var)
             if not any(x.variable == temp_var for x in self.cpds):
                 if all(x[1] == parents[0][1] for x in parents):
-                    if parents:
-                        evidence_card = cpd.cardinality[:0:-1]
-                        new_cpd = TabularCPD(
-                            temp_var,
-                            cpd.variable_card,
-                            cpd.values.reshape(
-                                cpd.variable_card, np.prod(evidence_card)
-                            ),
-                            parents,
-                            evidence_card,
-                        )
-                    else:
-                        if cpd.get_evidence():
-                            initial_cpd = cpd.marginalize(
-                                cpd.get_evidence(), inplace=False
-                            )
+                    if isinstance(cpd, TabularCPD):
+                        if parents:
+                            evidence_card = cpd.cardinality[:0:-1]
                             new_cpd = TabularCPD(
                                 temp_var,
                                 cpd.variable_card,
-                                np.reshape(initial_cpd.values, (-1, 1)),
+                                cpd.values.reshape(
+                                    cpd.variable_card, np.prod(evidence_card)
+                                ),
+                                parents,
+                                evidence_card,
                             )
                         else:
-                            new_cpd = TabularCPD(
-                                temp_var,
-                                cpd.variable_card,
-                                np.reshape(cpd.values, (-1, 1)),
+                            if cpd.get_evidence():
+                                initial_cpd = cpd.marginalize(
+                                    cpd.get_evidence(), inplace=False
+                                )
+                                new_cpd = TabularCPD(
+                                    temp_var,
+                                    cpd.variable_card,
+                                    np.reshape(initial_cpd.values, (-1, 1)),
+                                )
+                            else:
+                                new_cpd = TabularCPD(
+                                    temp_var,
+                                    cpd.variable_card,
+                                    np.reshape(cpd.values, (-1, 1)),
+                                )
+                    elif isinstance(cpd, LinearGaussianCPD):
+                        if parents:
+                            new_cpd = LinearGaussianCPD(
+                                temp_var, cpd.mean, cpd.variance, parents
                             )
+                        else:
+                            if cpd.get_evidence():
+                                initial_cpd = cpd.marginalize(
+                                    cpd.get_evidence(), inplace=False
+                                )
+                                new_cpd = LinearGaussianCPD(
+                                    temp_var, initial_cpd.mean, initial_cpd.variance
+                                )
+                            else:
+                                new_cpd = LinearGaussianCPD(
+                                    temp_var, cpd.mean, cpd.variance
+                                )
+                    else:
+                        raise ValueError(
+                            f"CPD expected TabularCPD or LinearGaussianCPD, but got {type(cpd)}."
+                        )
                     self.add_cpds(new_cpd)
             self.check_model()
 
