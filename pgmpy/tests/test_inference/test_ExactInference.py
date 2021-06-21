@@ -254,6 +254,139 @@ class TestVariableElimination(unittest.TestCase):
         del self.bayesian_model
 
 
+class TestSnowNetwork(unittest.TestCase):
+    def setUp(self):
+        self.model = BayesianModel(
+            [
+                ("Snow", "Risk"),
+                ("Snow", "Traffic"),
+                ("Traffic", "Late"),
+                ("Risk", "Late"),
+            ]
+        )
+
+        cpd_snow = TabularCPD(
+            "Snow", 2, [[0.4], [0.6]], state_names={"Snow": ["yes", "no"]}
+        )
+        cpd_risk = TabularCPD(
+            "Risk",
+            2,
+            [[0.8, 0.4], [0.2, 0.6]],
+            evidence=["Snow"],
+            evidence_card=[2],
+            state_names={"Snow": ["yes", "no"], "Risk": ["yes", "no"]},
+        )
+        cpd_traffic = TabularCPD(
+            "Traffic",
+            2,
+            [[0.4, 0.65], [0.6, 0.35]],
+            evidence=["Snow"],
+            evidence_card=[2],
+            state_names={"Traffic": ["normal", "slow"], "Snow": ["yes", "no"]},
+        )
+        cpd_late = TabularCPD(
+            "Late",
+            2,
+            [[0.45, 0.85, 0.1, 0.7], [0.55, 0.15, 0.90, 0.30]],
+            evidence=["Risk", "Traffic"],
+            evidence_card=[2, 2],
+            state_names={
+                "Late": ["yes", "no"],
+                "Traffic": ["normal", "slow"],
+                "Risk": ["yes", "no"],
+            },
+        )
+        self.model.add_cpds(cpd_snow, cpd_risk, cpd_traffic, cpd_late)
+
+    def test_queries(self):
+        for algo in [VariableElimination, BeliefPropagation]:
+            infer = algo(self.model)
+            query1 = infer.query(["Snow"], evidence={"Traffic": "slow"})
+            np_test.assert_array_almost_equal(query1.values, [0.533333, 0.466667])
+
+            query2 = infer.query(["Risk"], evidence={"Traffic": "slow"})
+            np_test.assert_array_almost_equal(query2.values, [0.613333, 0.386667])
+
+            query3 = infer.query(["Late"], evidence={"Traffic": "slow"})
+            np_test.assert_array_almost_equal(query3.values, [0.7920, 0.2080])
+
+            self.assertRaises(
+                ValueError,
+                infer.query,
+                variables=["Traffic"],
+                evidence={"Traffic": "slow"},
+            )
+
+    def test_virt_evidence(self):
+        virt_evidence = TabularCPD("Traffic", 2, [[0.3], [0.7]])
+        for algo in [VariableElimination, BeliefPropagation]:
+            infer = algo(self.model)
+            query1 = infer.query(["Snow"], virtual_evidence=[virt_evidence])
+            np_test.assert_array_almost_equal(query1.values, [0.45, 0.55])
+
+            map1 = infer.map_query(["Snow"], virtual_evidence=[virt_evidence])
+            self.assertEqual(map1, {"Snow": "no"})
+
+            query2 = infer.query(["Risk"], virtual_evidence=[virt_evidence])
+            np_test.assert_array_almost_equal(query2.values, [0.58, 0.42])
+
+            map2 = infer.map_query(["Risk"], virtual_evidence=[virt_evidence])
+            self.assertEqual(map2, {"Risk": "yes"})
+
+            query3 = infer.query(["Late"], virtual_evidence=[virt_evidence])
+            np_test.assert_array_almost_equal(query3.values, [0.61625, 0.38375])
+
+            map3 = infer.map_query(["Late"], virtual_evidence=[virt_evidence])
+            self.assertEqual(map3, {"Late": "yes"})
+
+            query4 = infer.query(["Traffic"], virtual_evidence=[virt_evidence])
+            np_test.assert_array_almost_equal(query4.values, [0.34375, 0.65625])
+
+            # TODO: State name should be returned here.
+            map4 = infer.map_query(["Traffic"], virtual_evidence=[virt_evidence])
+            self.assertTrue(map4 in [{"Traffic": "slow"}, {"Traffic": 1}])
+
+        virt_evidence1 = TabularCPD("Risk", 2, [[0.7], [0.3]])
+        for algo in [VariableElimination, BeliefPropagation]:
+            infer = algo(self.model)
+            query1 = infer.query(
+                ["Snow"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            np_test.assert_array_almost_equal(query1.values, [0.52443609, 0.47556391])
+
+            map1 = infer.map_query(
+                ["Snow"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            self.assertEqual(map1, {"Snow": "yes"})
+
+            query2 = infer.query(
+                ["Risk"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            np_test.assert_array_almost_equal(query2.values, [0.76315789, 0.23684211])
+            map2 = infer.map_query(
+                ["Risk"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            self.assertTrue(map2 in [{"Risk": 0}, {"Risk": "yes"}])
+
+            query3 = infer.query(
+                ["Traffic"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            np_test.assert_array_almost_equal(query3.values, [0.32730263, 0.67269737])
+            map3 = infer.map_query(
+                ["Traffic"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            self.assertTrue(map3 in [{"Traffic": "slow"}, {"Traffic": 1}])
+
+            query4 = infer.query(
+                ["Late"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            np_test.assert_array_almost_equal(query4.values, [0.66480263, 0.33519737])
+            map4 = infer.map_query(
+                ["Late"], virtual_evidence=[virt_evidence, virt_evidence1]
+            )
+            self.assertEqual(map4, {"Late": "yes"})
+
+
 class TestVariableEliminationDuplicatedFactors(unittest.TestCase):
     def setUp(self):
         self.markov_model = MarkovModel([("A", "B"), ("A", "C")])
